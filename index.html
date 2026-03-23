@@ -152,49 +152,53 @@
   .card-body { padding: 20px; }
 
   /* Input */
-  textarea#inputText {
-    width: 100%; height: 260px;
-    background: var(--bg2); color: var(--text);
-    border: 1px solid var(--border); border-radius: 10px;
-    padding: 14px; font-size: 0.95rem; resize: vertical;
-    font-family: 'DM Sans', sans-serif; line-height: 1.6;
-    transition: border .2s;
-    outline: none;
+  /* ── NOTEBOOK INPUT PAGES ── */
+  .notebook-input-wrap {
+    display: flex; flex-direction: column; gap: 12px;
+    padding: 0 16px 16px;
   }
-  textarea#inputText:focus { border-color: var(--purple); }
-  textarea#inputText::placeholder { color: var(--muted); }
-
-  /* ── PREVIEW ── */
-  .preview-wrapper {
+  .notebook-page-input {
     background: #fff;
-    border-radius: 10px;
-    overflow: hidden;
+    border-radius: 4px;
     position: relative;
-    min-height: 260px;
-    box-shadow: inset 0 0 0 1px #e0e0e0;
+    width: 100%;
+    aspect-ratio: 800 / 1128;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.07);
+    cursor: text;
   }
-  .notebook-lines {
+  .notebook-page-input .np-lines {
+    position: absolute; inset: 0; pointer-events: none;
+    background-image: linear-gradient(#c8cce0 1px, transparent 1px);
+    background-size: 100% var(--lh, 40px);
+    background-position: 0 var(--lh, 40px);
+    z-index: 0;
+  }
+  .notebook-page-input .np-margin {
+    position: absolute; top: 0; bottom: 0; left: 10%;
+    width: 1px; background: rgba(210,50,50,0.4);
+    pointer-events: none; z-index: 1;
+  }
+  /* Hidden real textarea — captures input, positioned over the page */
+  .notebook-page-input textarea {
     position: absolute; inset: 0;
-    background-image:
-      linear-gradient(#e8e8e8 1px, transparent 1px);
-    background-size: 100% 32px;
-    background-position: 0 28px;
-    pointer-events: none;
-  }
-  .margin-line {
-    position: absolute; top: 0; bottom: 0; left: 60px;
-    width: 1px; background: rgba(255,100,100,0.4);
-    pointer-events: none;
-  }
-  #previewCanvas {
-    width: 100%; min-height: 260px;
-    display: block; position: relative; z-index: 1;
+    width: 100%; height: 100%;
+    background: transparent;
+    border: none; outline: none; resize: none;
     font-family: 'Caveat', cursive;
-    font-size: 18px; color: #1a3a8f;
-    padding: 20px 20px 20px 70px;
-    white-space: pre-wrap; word-break: break-word;
-    line-height: 32px; background: transparent;
+    color: #1a3a8f;
+    padding-top: calc(var(--lh, 40px) * 0.12);
+    padding-left: calc(10% + 6px);
+    padding-right: 3%;
+    line-height: var(--lh, 40px);
+    font-size: var(--fs, 18px);
+    z-index: 2;
+    overflow: hidden;
+    caret-color: #333;
+    white-space: pre-wrap;
+    word-break: break-word;
   }
+  .notebook-page-input textarea::placeholder { color: #bbb; }
 
   /* ── CUSTOMIZATIONS ── */
   .section-label {
@@ -283,6 +287,38 @@
   .btn-generate:hover::after { opacity: 1; }
   .btn-generate:active { transform: translateY(0); }
 
+  /* ── PAGE CARDS ── */
+  .page-card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+    overflow: hidden;
+    position: relative;
+    flex-shrink: 0;
+    width: min(340px, 90vw);
+  }
+  .page-card canvas { width: 100%; height: auto; display: block; }
+  .page-card-footer {
+    padding: 10px 12px;
+    background: var(--surface2);
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px;
+  }
+  .page-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.72rem; font-weight: 700;
+    color: var(--muted); letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  .page-dl-btn {
+    background: linear-gradient(135deg, var(--yellow) 0%, #e8a900 100%);
+    color: #1a1000; border: none; border-radius: 7px;
+    padding: 6px 14px; font-size: 0.75rem; font-weight: 700;
+    font-family: 'Syne', sans-serif; cursor: pointer;
+    text-decoration: none; transition: all .2s;
+  }
+  .page-dl-btn:hover { opacity: .85; transform: translateY(-1px); }
+
   /* ── OUTPUT ── */
   .output-section {
     max-width: 1100px; margin: 0 auto 40px;
@@ -305,6 +341,7 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 0.9rem; color: var(--muted);
     overflow: hidden; position: relative;
+    flex-direction: column;
   }
   #outputCanvas {
     display: none; width: 100%; height: auto;
@@ -595,7 +632,7 @@
 <!-- HERO -->
 <section class="hero">
   <h1>Convert Text to<br><em>Handwritten</em> Notes</h1>
-  <p class="hero-sub">Paste any text and turn it into a realistic handwritten page image — with fully customizable fonts, colors, and paper styles — completely free, with no cost at all.</p>
+  <p class="hero-sub">Paste any text and get a realistic handwritten page image — fully customizable fonts, colors, and paper styles.</p>
   <div class="ethical-note">⚠️ <strong>Important Note:</strong> Do not use this tool for unethical purposes.</div>
 </section>
 
@@ -606,19 +643,10 @@
   <div class="card">
     <div class="card-header">
       <span class="card-title">Input</span>
+      <span style="font-size:.7rem;color:var(--muted);">Type/Paste text here</span>
     </div>
-    <div class="card-body">
-      <textarea id="inputText" placeholder="Write something here to see the live preview...">Start writing here to see the live preview.
-This tool converts your typed text into realistic handwritten notes.
-Try customizing the font, ink color, and paper style on the right!</textarea>
-    </div>
-    <div style="padding: 0 20px 10px;">
-      <div style="font-size:.75rem;color:var(--muted);margin-bottom:8px;font-weight:500;">Live Preview</div>
-      <div class="preview-wrapper">
-        <div class="notebook-lines"></div>
-        <div class="margin-line"></div>
-        <div id="previewCanvas"></div>
-      </div>
+    <div class="notebook-input-wrap" id="notebookInputWrap">
+      <!-- Pages rendered by JS -->
     </div>
   </div>
 
@@ -669,7 +697,7 @@ Try customizing the font, ink color, and paper style on the right!</textarea>
     <div class="options-grid">
       <div class="opt-group">
         <label>Font Size</label>
-        <input type="number" id="fontSize" value="18" min="10" max="36"/>
+        <input type="number" id="fontSize" value="30" min="10" max="60"/>
       </div>
       <div class="opt-group">
         <label>Ink Color</label>
@@ -744,16 +772,13 @@ Try customizing the font, ink color, and paper style on the right!</textarea>
 
 <!-- OUTPUT -->
 <div class="output-section">
-  <div class="section-heading">Output</div>
+  <div class="section-heading" id="outputHeading">Output</div>
   <div class="output-box" id="outputBox">
     <div class="output-placeholder" id="outputPlaceholder">
       <div class="icon">📄</div>
       <div>Click "Generate Image" to create your handwritten page</div>
     </div>
-    <canvas id="outputCanvas"></canvas>
-  </div>
-  <div style="text-align:center;margin-top:12px;">
-    <a id="downloadBtn" class="download-btn" download="handwriting.png">⬇️ Download Image</a>
+    <div id="pagesContainer" style="display:none; width:100%; padding:20px; display:none; gap:20px; flex-wrap:wrap; justify-content:center;"></div>
   </div>
 </div>
 
@@ -825,62 +850,51 @@ Try customizing the font, ink color, and paper style on the right!</textarea>
 <link href="https://fonts.googleapis.com/css2?family=Homemade+Apple&family=Dancing+Script:wght@600&family=Indie+Flower&family=Kalam&family=Patrick+Hand&family=Architects+Daughter&display=swap" rel="stylesheet"/>
 
 <script>
-// Live preview
-const inputText = document.getElementById('inputText');
-const previewCanvas = document.getElementById('previewCanvas');
-const fontSelect = document.getElementById('fontSelect');
-const fontSize = document.getElementById('fontSize');
-const inkColor = document.getElementById('inkColor');
-const paperMargin = document.getElementById('paperMargin');
-const paperLines = document.getElementById('paperLines');
-const wordSpacing = document.getElementById('wordSpacing');
-const letterSpacing = document.getElementById('letterSpacing');
-
-// Custom font state
+// ── State ──
+let masterText = `Start writing here to see the live preview.\nThis tool converts your typed text into realistic handwritten notes.\nTry customizing the font, ink color, and paper style on the right!`;
 let customFontName = null;
 
-// Handle custom font upload
+const fontSelect    = document.getElementById('fontSelect');
+const fontSize      = document.getElementById('fontSize');
+const inkColor      = document.getElementById('inkColor');
+const paperMargin   = document.getElementById('paperMargin');
+const paperLines    = document.getElementById('paperLines');
+const wordSpacing   = document.getElementById('wordSpacing');
+const letterSpacing = document.getElementById('letterSpacing');
+
+// ── Custom font upload ──
 document.getElementById('customFontFile').addEventListener('change', function(e) {
   const file = e.target.files[0];
   if (!file) return;
-
-  const status = document.getElementById('uploadFontStatus');
-  const label = document.getElementById('uploadFontLabel');
-  const labelText = document.getElementById('uploadFontLabelText');
-
+  const status   = document.getElementById('uploadFontStatus');
+  const label    = document.getElementById('uploadFontLabel');
+  const labelTxt = document.getElementById('uploadFontLabelText');
   if (!file.name.match(/\.(ttf|otf)$/i)) {
     status.className = 'upload-font-status error';
     status.innerHTML = '✕ Invalid file. Please upload a <strong>.ttf</strong> or <strong>.otf</strong> file.';
-    status.style.display = 'flex';
-    return;
+    status.style.display = 'flex'; return;
   }
-
   const reader = new FileReader();
   reader.onload = function(ev) {
     try {
-      const fontDataUrl = ev.target.result;
-      customFontName = 'CustomHandwriting_' + Date.now();
+      customFontName = 'CustomHW_' + Date.now();
       const style = document.createElement('style');
-      style.textContent = `@font-face { font-family: '${customFontName}'; src: url('${fontDataUrl}'); }`;
+      style.textContent = `@font-face{font-family:'${customFontName}';src:url('${ev.target.result}');}`;
       document.head.appendChild(style);
-
-      // Add option to select and switch to it
       const existing = document.getElementById('customFontOption');
       if (existing) existing.remove();
       const opt = document.createElement('option');
       opt.id = 'customFontOption';
-      opt.value = `'${customFontName}', cursive`;
-      opt.textContent = '✓ ' + file.name.replace(/\.(ttf|otf)$/i, '') + ' (Your Font)';
+      opt.value = `'${customFontName}',cursive`;
+      opt.textContent = '✓ ' + file.name.replace(/\.(ttf|otf)$/i,'') + ' (Your Font)';
       fontSelect.appendChild(opt);
       fontSelect.value = opt.value;
-
       label.classList.add('loaded');
-      labelText.textContent = '✓ ' + file.name;
+      labelTxt.textContent = '✓ ' + file.name;
       status.className = 'upload-font-status success';
       status.innerHTML = '✓ Font loaded successfully! Your handwriting is now active.';
       status.style.display = 'flex';
-
-      updatePreview();
+      rebuildPages();
     } catch(err) {
       status.className = 'upload-font-status error';
       status.innerHTML = '✕ Failed to load font. Please try another file.';
@@ -890,32 +904,168 @@ document.getElementById('customFontFile').addEventListener('change', function(e)
   reader.readAsDataURL(file);
 });
 
-function updatePreview() {
-  const text = inputText.value;
-  const font = fontSelect.value;
-  const size = fontSize.value;
-  const color = inkColor.value;
-  const ws = wordSpacing.value;
-  const ls = letterSpacing.value;
+// ── Page layout constants ──
+const PAGE_W = 800, PAGE_H = 1128;
+const MARGIN_TOP = 46, MARGIN_BOTTOM = 36, MARGIN_RIGHT = 20;
 
-  previewCanvas.style.fontFamily = font;
-  previewCanvas.style.fontSize = size + 'px';
-  previewCanvas.style.color = color;
-  previewCanvas.style.wordSpacing = ws + 'px';
-  previewCanvas.style.letterSpacing = ls + 'pt';
-
-  const lines = document.querySelector('.notebook-lines');
-  const margin = document.querySelector('.margin-line');
-  lines.style.display = paperLines.checked ? 'block' : 'none';
-  margin.style.display = paperMargin.checked ? 'block' : 'none';
-  previewCanvas.style.paddingLeft = paperMargin.checked ? '70px' : '20px';
-
-  previewCanvas.textContent = text;
+function getSettings() {
+  return {
+    font    : fontSelect.value,
+    size    : Math.max(10, parseInt(fontSize.value) || 30),
+    color   : inkColor.value,
+    ws      : parseFloat(wordSpacing.value) || 0,
+    ls      : parseFloat(letterSpacing.value) || 0,
+    lines   : paperLines.checked,
+    margin  : paperMargin.checked,
+  };
 }
 
-[inputText, fontSelect, fontSize, inkColor, paperMargin, paperLines, wordSpacing, letterSpacing]
-  .forEach(el => el.addEventListener('input', updatePreview));
-updatePreview();
+function getLineH(size) { return Math.round(size * 1.72); }
+function getMarginLeft(hasMargin) { return hasMargin ? Math.round(PAGE_W * 0.10) : 18; }
+
+// Measure text wrapping at actual canvas scale
+function computeAllLines(text, size, font, marginLeft) {
+  const maxW = PAGE_W - marginLeft - MARGIN_RIGHT;
+  const mCv = document.createElement('canvas');
+  mCv.width = PAGE_W; mCv.height = 100;
+  const mCtx = mCv.getContext('2d');
+  mCtx.font = `${size}px ${font}`;
+  const result = [];
+  for (const para of text.split('\n')) {
+    if (para.trim() === '') { result.push(''); continue; }
+    const words = para.split(' ');
+    let cur = '';
+    for (const w of words) {
+      const test = cur ? cur + ' ' + w : w;
+      if (mCtx.measureText(test).width > maxW && cur) {
+        result.push(cur); cur = w;
+      } else { cur = test; }
+    }
+    if (cur !== '') result.push(cur);
+  }
+  return result;
+}
+
+function linesPerPage(size, hasMargin) {
+  const lh = getLineH(size);
+  return Math.floor((PAGE_H - MARGIN_TOP - MARGIN_BOTTOM) / lh);
+}
+
+// ── Build notebook pages in the input card ──
+function rebuildPages() {
+  const s = getSettings();
+  const wrap = document.getElementById('notebookInputWrap');
+  const lh = getLineH(s.size);
+  const ml = getMarginLeft(s.margin);
+  const lpp = linesPerPage(s.size, s.margin);
+  const allLines = computeAllLines(masterText, s.size, s.font, ml);
+  const totalPages = Math.max(1, Math.ceil(allLines.length / lpp));
+
+  // Get actual rendered width of the wrap container
+  // The page will render at this width (aspect-ratio handles height)
+  const containerW = wrap.getBoundingClientRect().width || (wrap.offsetWidth) || 400;
+  // Scale factor: containerW / PAGE_W
+  const scale = containerW / PAGE_W;
+  // Scaled font & line height in actual px
+  const fsPx   = (s.size * scale).toFixed(2) + 'px';
+  const lhPx   = (lh * scale).toFixed(2) + 'px';
+  const mlPx   = (ml * scale).toFixed(2) + 'px';
+  const mtPx   = (MARGIN_TOP * scale * 0.5).toFixed(2) + 'px';
+  const bgSz   = `100% ${(lh * scale).toFixed(2)}px`;
+  const bgPos  = `0 ${(lh * scale * 0.72).toFixed(2)}px`;
+
+  // Preserve focus
+  const oldPages = wrap.querySelectorAll('.notebook-page-input');
+  const focusIdx = [...oldPages].findIndex(p => p.querySelector('textarea') === document.activeElement);
+
+  wrap.innerHTML = '';
+
+  for (let p = 0; p < totalPages; p++) {
+    const pageLines = allLines.slice(p * lpp, (p + 1) * lpp);
+    const page = document.createElement('div');
+    page.className = 'notebook-page-input';
+
+    if (s.lines) {
+      const linesDiv = document.createElement('div');
+      linesDiv.className = 'np-lines';
+      linesDiv.style.backgroundSize = bgSz;
+      linesDiv.style.backgroundPosition = bgPos;
+      page.appendChild(linesDiv);
+    }
+    if (s.margin) {
+      const mDiv = document.createElement('div');
+      mDiv.className = 'np-margin';
+      mDiv.style.left = mlPx;
+      page.appendChild(mDiv);
+    }
+
+    const ta = document.createElement('textarea');
+    ta.style.fontFamily    = s.font;
+    ta.style.fontSize      = fsPx;
+    ta.style.lineHeight    = lhPx;
+    ta.style.color         = s.color;
+    ta.style.paddingLeft   = `calc(${mlPx} + 4px)`;
+    ta.style.paddingTop    = (lh * scale * 0.72).toFixed(2) + 'px';
+    ta.style.paddingRight  = (MARGIN_RIGHT * scale).toFixed(2) + 'px';
+    ta.style.wordSpacing   = s.ws + 'px';
+    ta.style.letterSpacing = s.ls + 'px';
+
+    if (p === 0) {
+      ta.value = masterText;
+      ta.placeholder = 'Type or paste text here…';
+      ta.addEventListener('input', function() {
+        masterText = this.value;
+        rebuildPages();
+      });
+      ta.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          this.setRangeText('\t', this.selectionStart, this.selectionEnd, 'end');
+          masterText = this.value;
+          rebuildPages();
+        }
+      });
+    } else {
+      ta.value = pageLines.join('\n');
+      ta.readOnly = true;
+      ta.style.pointerEvents = 'none';
+      ta.style.userSelect = 'none';
+    }
+
+    page.appendChild(ta);
+
+    if (totalPages > 1) {
+      const badge = document.createElement('div');
+      badge.style.cssText = 'position:absolute;bottom:6px;right:10px;font-size:10px;color:#aaa;font-family:sans-serif;z-index:3;background:rgba(255,255,255,0.75);padding:1px 6px;border-radius:4px;';
+      badge.textContent = `${p + 1} / ${totalPages}`;
+      page.appendChild(badge);
+    }
+
+    wrap.appendChild(page);
+  }
+
+  // Restore focus
+  if (focusIdx >= 0) {
+    const pages = wrap.querySelectorAll('.notebook-page-input');
+    if (pages[focusIdx]) {
+      const ta = pages[focusIdx].querySelector('textarea');
+      if (ta) { ta.focus(); }
+    }
+  }
+}
+
+// Rebuild on window resize so font scale stays accurate
+window.addEventListener('resize', () => rebuildPages());
+
+[fontSelect, fontSize, inkColor, paperMargin, paperLines, wordSpacing, letterSpacing]
+  .forEach(el => el.addEventListener('input', rebuildPages));
+
+// Run after fonts load for accurate initial scale
+document.fonts.ready.then(() => rebuildPages());
+rebuildPages();
+
+// helper so generateImage can read current text
+function getCurrentText() { return masterText; }
 
 // Generate image using canvas
 async function generateImage() {
@@ -926,33 +1076,37 @@ async function generateImage() {
   btn.innerHTML = 'Generating…';
 
   try {
-    const text = inputText.value || 'Start writing something above.';
+    const text = getCurrentText() || 'Start writing something above.';
     const fontVal = fontSelect.value;
     const size = parseInt(fontSize.value) || 18;
     const color = inkColor.value;
-    const ws = parseInt(wordSpacing.value) || 0;
     const ls = parseInt(letterSpacing.value) || 0;
     const withLines = paperLines.checked;
     const withMargin = paperMargin.checked;
     const effects = document.getElementById('effects').value;
 
-    // Wait for fonts to be ready
+    // Wait for fonts
     await document.fonts.ready;
-    await new Promise(r => setTimeout(r, 120));
+    await new Promise(r => setTimeout(r, 150));
 
-    // Constants
-    const SCALE = 3;
-    const W = 794;
-    const A4_H = 1122;
-    const marginLeft = withMargin ? 80 : 24;
-    const marginTop = 40;
-    const lineH = size * 1.8;
-    const maxWidth = W - marginLeft - 30;
+    // Page size
+    const pageSizeVal = document.getElementById('pageSize').value;
+    const PAGE_SIZES = { a4: [800,1128], letter: [816,1056], a5: [566,800] };
+    const [W, A4_H] = PAGE_SIZES[pageSizeVal] || PAGE_SIZES.a4;
 
-    // ── Measure pass: figure out how many wrapped lines ──
-    const mCanvas = document.createElement('canvas');
-    mCanvas.width = W * SCALE; mCanvas.height = 200;
-    const mCtx = mCanvas.getContext('2d');
+    const SCALE = 1;
+    const marginLeft = withMargin ? 64 : 20;
+    const marginRight = 20;
+    const marginTop = 48;
+    const marginBottom = 40;
+    const lineH = Math.round(size * 1.75);
+    const maxWidth = W - marginLeft - marginRight;
+    const linesPerPage = Math.floor((A4_H - marginTop - marginBottom) / lineH);
+
+    // ── Measure & wrap ──
+    const mCv = document.createElement('canvas');
+    mCv.width = W * SCALE; mCv.height = 200;
+    const mCtx = mCv.getContext('2d');
     mCtx.font = `${size}px ${fontVal}`;
 
     function wrapText(ctx2, txt, maxW) {
@@ -972,105 +1126,111 @@ async function generateImage() {
       return result;
     }
 
-    const wrappedLines = wrapText(mCtx, text, maxWidth);
+    const allLines = wrapText(mCtx, text, maxWidth);
 
-    // Snap canvas height to full A4 pages
-    const contentHeight = marginTop + lineH + wrappedLines.length * lineH + 60;
-    const pages = Math.max(1, Math.ceil(contentHeight / A4_H));
-    const H = pages * A4_H;
-
-    // ── Draw canvas ──
-    const canvas = document.getElementById('outputCanvas');
-    canvas.width  = W * SCALE;   // actual pixels: 2382px wide
-    canvas.height = H * SCALE;   // actual pixels: 3366px+ tall
-    canvas.style.width  = '100%'; // display: fits container
-    canvas.style.height = 'auto'; // display: proportional
-
-    const ctx = canvas.getContext('2d');
-    ctx.scale(SCALE, SCALE);
-
-    // Paper background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, W, H);
-
-    // Subtle paper texture
-    for (let i = 0; i < 2000 * pages; i++) {
-      ctx.fillStyle = `rgba(0,0,0,${Math.random() * 0.01})`;
-      ctx.fillRect(Math.random() * W, Math.random() * H, 1, 1);
+    // Split into pages
+    const pages = [];
+    for (let i = 0; i < allLines.length; i += linesPerPage) {
+      pages.push(allLines.slice(i, i + linesPerPage));
     }
+    if (pages.length === 0) pages.push(['']);
 
-    // Ruled lines
-    if (withLines) {
-      ctx.strokeStyle = '#d9d9e8';
-      ctx.lineWidth = 0.8;
-      for (let ly = marginTop + lineH; ly < H - 10; ly += lineH) {
-        ctx.beginPath(); ctx.moveTo(16, ly); ctx.lineTo(W - 16, ly); ctx.stroke();
-      }
-    }
+    // ── Draw each page ──
+    function drawPage(lines) {
+      const cv = document.createElement('canvas');
+      cv.width  = W * SCALE;
+      cv.height = A4_H * SCALE;
+      const ctx = cv.getContext('2d');
+      ctx.scale(SCALE, SCALE);
 
-    // Page break markers
-    if (pages > 1) {
-      ctx.strokeStyle = 'rgba(180,180,210,0.45)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([6, 5]);
-      for (let p = 1; p < pages; p++) {
-        ctx.beginPath(); ctx.moveTo(0, p * A4_H); ctx.lineTo(W, p * A4_H); ctx.stroke();
-      }
-      ctx.setLineDash([]);
-    }
+      // White paper
+      ctx.fillStyle = '#fdfdfd';
+      ctx.fillRect(0, 0, W, A4_H);
 
-    // Margin line
-    if (withMargin) {
-      ctx.strokeStyle = 'rgba(255,90,90,0.4)';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath(); ctx.moveTo(60, 0); ctx.lineTo(60, H); ctx.stroke();
-    }
-
-    // Text rendering
-    ctx.font = `${size}px ${fontVal}`;
-    ctx.fillStyle = color;
-    ctx.textBaseline = 'alphabetic';
-
-    let y = marginTop + lineH;
-    for (const line of wrappedLines) {
-      if (!line) { y += lineH; continue; }
-
-      const tilt = effects === 'slight-tilt' ? (Math.random() - 0.5) * 0.012 : 0;
-      ctx.save();
-      ctx.translate(marginLeft, y);
-      ctx.rotate(tilt);
-
-      if (effects === 'shadows') {
-        ctx.shadowColor = 'rgba(0,0,0,0.1)';
-        ctx.shadowBlur = 1.5;
-        ctx.shadowOffsetX = 0.6; ctx.shadowOffsetY = 0.6;
+      // Paper texture
+      for (let i = 0; i < 1800; i++) {
+        ctx.fillStyle = `rgba(0,0,0,${Math.random()*0.008})`;
+        ctx.fillRect(Math.random()*W, Math.random()*A4_H, 1, 1);
       }
 
-      if (ls !== 0) {
-        let xp = 0;
-        for (const ch of line) {
-          ctx.fillText(ch, xp, 0);
-          xp += ctx.measureText(ch).width + ls;
+      // Ruled lines
+      if (withLines) {
+        ctx.strokeStyle = '#cdd0e0';
+        ctx.lineWidth = 0.7;
+        for (let ly = marginTop + lineH; ly < A4_H - marginBottom; ly += lineH) {
+          ctx.beginPath(); ctx.moveTo(14, ly); ctx.lineTo(W-14, ly); ctx.stroke();
         }
-      } else {
-        ctx.fillText(line, 0, 0);
       }
-      ctx.restore();
-      y += lineH;
+
+      // Margin line
+      if (withMargin) {
+        ctx.strokeStyle = 'rgba(230,70,70,0.4)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(54, 0); ctx.lineTo(54, A4_H); ctx.stroke();
+      }
+
+      // Text
+      ctx.font = `${size}px ${fontVal}`;
+      ctx.fillStyle = color;
+      ctx.textBaseline = 'alphabetic';
+
+      let y = marginTop + lineH;
+      for (const line of lines) {
+        if (!line) { y += lineH; continue; }
+        const tilt = effects === 'slight-tilt' ? (Math.random()-0.5)*0.01 : 0;
+        ctx.save();
+        ctx.translate(marginLeft, y);
+        ctx.rotate(tilt);
+        if (effects === 'shadows') {
+          ctx.shadowColor = 'rgba(0,0,0,0.08)';
+          ctx.shadowBlur = 1.5;
+          ctx.shadowOffsetX = 0.5; ctx.shadowOffsetY = 0.5;
+        }
+        if (ls !== 0) {
+          let xp = 0;
+          for (const ch of line) {
+            ctx.fillText(ch, xp, 0);
+            xp += ctx.measureText(ch).width + ls;
+          }
+        } else {
+          ctx.fillText(line, 0, 0);
+        }
+        ctx.restore();
+        y += lineH;
+      }
+      return cv;
     }
 
-    // Show output
-    document.getElementById('outputPlaceholder').style.display = 'none';
-    canvas.style.display = 'block';
-    const downloadBtn = document.getElementById('downloadBtn');
-    downloadBtn.style.display = 'inline-block';
+    // ── Render output ──
+    const container = document.getElementById('pagesContainer');
+    container.innerHTML = '';
+    container.style.display = 'flex';
 
-    // Use Blob for reliable HD download (avoids toDataURL size limits)
-    canvas.toBlob((blob) => {
-      const url = URL.createObjectURL(blob);
-      downloadBtn.href = url;
-      downloadBtn.download = 'handwriting_hd.png';
-    }, 'image/png', 1.0);
+    document.getElementById('outputPlaceholder').style.display = 'none';
+    document.getElementById('outputHeading').textContent = `Output (${pages.length} page${pages.length > 1 ? 's' : ''})`;
+
+    pages.forEach((pageLines, idx) => {
+      const cv = drawPage(pageLines);
+      const card = document.createElement('div');
+      card.className = 'page-card';
+      card.appendChild(cv);
+
+      const footer = document.createElement('div');
+      footer.className = 'page-card-footer';
+      const lbl = document.createElement('span');
+      lbl.className = 'page-label';
+      lbl.textContent = `Page ${idx + 1} of ${pages.length}`;
+      const dlBtn = document.createElement('a');
+      dlBtn.className = 'page-dl-btn';
+      dlBtn.textContent = '⬇️ Download';
+      dlBtn.download = `handwriting_page${idx+1}.png`;
+      cv.toBlob(blob => { dlBtn.href = URL.createObjectURL(blob); }, 'image/png', 1.0);
+
+      footer.appendChild(lbl);
+      footer.appendChild(dlBtn);
+      card.appendChild(footer);
+      container.appendChild(card);
+    });
 
   } catch (err) {
     console.error('Generation failed:', err);
