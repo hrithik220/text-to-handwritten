@@ -152,9 +152,8 @@
   .card-body { padding: 20px; }
 
   /* Input */
-  /* ── NOTEBOOK INPUT PAGES ── */
+  /* ── NOTEBOOK INPUT - Single Scrollable Page ── */
   .notebook-input-wrap {
-    display: flex; flex-direction: column; gap: 12px;
     padding: 0 16px 16px;
   }
   .notebook-page-input {
@@ -162,41 +161,38 @@
     border-radius: 4px;
     position: relative;
     width: 100%;
-    aspect-ratio: 800 / 1128;
-    overflow: hidden;
+    height: 520px;
+    overflow-y: auto;
+    overflow-x: hidden;
     box-shadow: 0 2px 12px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.07);
     cursor: text;
   }
   .notebook-page-input .np-lines {
-    position: absolute; inset: 0; pointer-events: none;
+    position: absolute; left: 0; right: 0; top: 0;
+    min-height: 100%;
+    pointer-events: none;
     background-image: linear-gradient(#c8cce0 1px, transparent 1px);
     background-size: 100% var(--lh, 40px);
     background-position: 0 var(--lh, 40px);
     z-index: 0;
   }
   .notebook-page-input .np-margin {
-    position: absolute; top: 0; bottom: 0; left: 10%;
+    position: absolute; top: 0; bottom: 0; left: var(--ml, 80px);
     width: 1px; background: rgba(210,50,50,0.4);
     pointer-events: none; z-index: 1;
   }
-  /* Hidden real textarea — captures input, positioned over the page */
   .notebook-page-input textarea {
     position: absolute; inset: 0;
     width: 100%; height: 100%;
+    min-height: 100%;
     background: transparent;
     border: none; outline: none; resize: none;
     font-family: 'Caveat', cursive;
     color: #1a3a8f;
-    padding-top: calc(var(--lh, 40px) * 0.12);
-    padding-left: calc(10% + 6px);
-    padding-right: 3%;
-    line-height: var(--lh, 40px);
-    font-size: var(--fs, 18px);
     z-index: 2;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
     caret-color: #333;
-    white-space: pre-wrap;
-    word-break: break-word;
   }
   .notebook-page-input textarea::placeholder { color: #bbb; }
 
@@ -318,6 +314,19 @@
     text-decoration: none; transition: all .2s;
   }
   .page-dl-btn:hover { opacity: .85; transform: translateY(-1px); }
+
+  .btn-pdf {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+    color: #fff; border: none; border-radius: 10px;
+    padding: 12px 28px; font-size: 0.95rem; font-weight: 700;
+    font-family: 'Syne', sans-serif; cursor: pointer;
+    letter-spacing: 0.04em;
+    box-shadow: 0 4px 20px rgba(124,58,237,0.4);
+    transition: all .2s;
+  }
+  .btn-pdf:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(124,58,237,0.55); }
+  .btn-pdf:active { transform: translateY(0); }
 
   /* ── OUTPUT ── */
   .output-section {
@@ -632,7 +641,7 @@
 <!-- HERO -->
 <section class="hero">
   <h1>Convert Text to<br><em>Handwritten</em> Notes</h1>
-  <p class="hero-sub">Paste any text and turn it into a realistic handwritten page image — with fully customizable fonts, colors, and paper styles — completely free, with no cost at all.</p>
+  <p class="hero-sub">Paste any text and get a realistic handwritten page image — fully customizable fonts, colors, and paper styles.</p>
   <div class="ethical-note">⚠️ <strong>Important Note:</strong> Do not use this tool for unethical purposes.</div>
 </section>
 
@@ -778,7 +787,12 @@
       <div class="icon">📄</div>
       <div>Click "Generate Image" to create your handwritten page</div>
     </div>
-    <div id="pagesContainer" style="display:none; width:100%; padding:20px; display:none; gap:20px; flex-wrap:wrap; justify-content:center;"></div>
+    <div id="pagesContainer" style="display:none; width:100%; padding:20px; gap:20px; flex-wrap:wrap; justify-content:center;"></div>
+  </div>
+  <div id="outputActions" style="display:none; margin-top:16px; display:none; gap:12px; justify-content:center; flex-wrap:wrap;">
+    <button class="btn-pdf" id="downloadPdfBtn">
+      📄 Download All as PDF
+    </button>
   </div>
 </div>
 
@@ -848,6 +862,9 @@
 
 <!-- GOOGLE FONTS for handwriting options -->
 <link href="https://fonts.googleapis.com/css2?family=Homemade+Apple&family=Dancing+Script:wght@600&family=Indie+Flower&family=Kalam&family=Patrick+Hand&family=Architects+Daughter&display=swap" rel="stylesheet"/>
+
+<!-- jsPDF for PDF export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script>
 // ── State ──
@@ -955,106 +972,71 @@ function linesPerPage(size, hasMargin) {
 function rebuildPages() {
   const s = getSettings();
   const wrap = document.getElementById('notebookInputWrap');
-  const lh = getLineH(s.size);
-  const ml = getMarginLeft(s.margin);
-  const lpp = linesPerPage(s.size, s.margin);
-  const allLines = computeAllLines(masterText, s.size, s.font, ml);
-  const totalPages = Math.max(1, Math.ceil(allLines.length / lpp));
 
-  // Get actual rendered width of the wrap container
-  // The page will render at this width (aspect-ratio handles height)
-  const containerW = wrap.getBoundingClientRect().width || (wrap.offsetWidth) || 400;
-  // Scale factor: containerW / PAGE_W
+  const containerW = wrap.getBoundingClientRect().width || wrap.offsetWidth || 400;
   const scale = containerW / PAGE_W;
-  // Scaled font & line height in actual px
-  const fsPx   = (s.size * scale).toFixed(2) + 'px';
-  const lhPx   = (lh * scale).toFixed(2) + 'px';
-  const mlPx   = (ml * scale).toFixed(2) + 'px';
-  const mtPx   = (MARGIN_TOP * scale * 0.5).toFixed(2) + 'px';
-  const bgSz   = `100% ${(lh * scale).toFixed(2)}px`;
-  const bgPos  = `0 ${(lh * scale * 0.72).toFixed(2)}px`;
+  const lh  = getLineH(s.size);
+  const ml  = getMarginLeft(s.margin);
 
-  // Preserve focus
-  const oldPages = wrap.querySelectorAll('.notebook-page-input');
-  const focusIdx = [...oldPages].findIndex(p => p.querySelector('textarea') === document.activeElement);
+  const fsPx  = (s.size * scale).toFixed(2) + 'px';
+  const lhPx  = (lh * scale).toFixed(2) + 'px';
+  const mlPx  = (ml * scale).toFixed(2) + 'px';
+  const ptPx  = (lh * scale * 0.72).toFixed(2) + 'px';
+  const prPx  = (MARGIN_RIGHT * scale).toFixed(2) + 'px';
 
-  wrap.innerHTML = '';
+  // Check if page already exists — just update styles, don't rebuild
+  let page = wrap.querySelector('.notebook-page-input');
+  let ta   = page ? page.querySelector('textarea') : null;
+  let linesDiv = page ? page.querySelector('.np-lines') : null;
+  let marginDiv = page ? page.querySelector('.np-margin') : null;
 
-  for (let p = 0; p < totalPages; p++) {
-    const pageLines = allLines.slice(p * lpp, (p + 1) * lpp);
-    const page = document.createElement('div');
+  if (!page) {
+    page = document.createElement('div');
     page.className = 'notebook-page-input';
 
-    if (s.lines) {
-      const linesDiv = document.createElement('div');
-      linesDiv.className = 'np-lines';
-      linesDiv.style.backgroundSize = bgSz;
-      linesDiv.style.backgroundPosition = bgPos;
-      page.appendChild(linesDiv);
-    }
-    if (s.margin) {
-      const mDiv = document.createElement('div');
-      mDiv.className = 'np-margin';
-      mDiv.style.left = mlPx;
-      page.appendChild(mDiv);
-    }
+    linesDiv = document.createElement('div');
+    linesDiv.className = 'np-lines';
+    page.appendChild(linesDiv);
 
-    const ta = document.createElement('textarea');
-    ta.style.fontFamily    = s.font;
-    ta.style.fontSize      = fsPx;
-    ta.style.lineHeight    = lhPx;
-    ta.style.color         = s.color;
-    ta.style.paddingLeft   = `calc(${mlPx} + 4px)`;
-    ta.style.paddingTop    = (lh * scale * 0.72).toFixed(2) + 'px';
-    ta.style.paddingRight  = (MARGIN_RIGHT * scale).toFixed(2) + 'px';
-    ta.style.wordSpacing   = s.ws + 'px';
-    ta.style.letterSpacing = s.ls + 'px';
+    marginDiv = document.createElement('div');
+    marginDiv.className = 'np-margin';
+    page.appendChild(marginDiv);
 
-    if (p === 0) {
-      ta.value = masterText;
-      ta.placeholder = 'Type or paste text here…';
-      ta.addEventListener('input', function() {
+    ta = document.createElement('textarea');
+    ta.value = masterText;
+    ta.placeholder = 'Type or paste text here…';
+    ta.addEventListener('input', function() { masterText = this.value; });
+    ta.addEventListener('keydown', function(e) {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        this.setRangeText('\t', this.selectionStart, this.selectionEnd, 'end');
         masterText = this.value;
-        rebuildPages();
-      });
-      ta.addEventListener('keydown', function(e) {
-        if (e.key === 'Tab') {
-          e.preventDefault();
-          this.setRangeText('\t', this.selectionStart, this.selectionEnd, 'end');
-          masterText = this.value;
-          rebuildPages();
-        }
-      });
-    } else {
-      ta.value = pageLines.join('\n');
-      ta.readOnly = true;
-      ta.style.pointerEvents = 'none';
-      ta.style.userSelect = 'none';
-    }
-
+      }
+    });
     page.appendChild(ta);
-
-    if (totalPages > 1) {
-      const badge = document.createElement('div');
-      badge.style.cssText = 'position:absolute;bottom:6px;right:10px;font-size:10px;color:#aaa;font-family:sans-serif;z-index:3;background:rgba(255,255,255,0.75);padding:1px 6px;border-radius:4px;';
-      badge.textContent = `${p + 1} / ${totalPages}`;
-      page.appendChild(badge);
-    }
-
+    wrap.innerHTML = '';
     wrap.appendChild(page);
   }
 
-  // Restore focus
-  if (focusIdx >= 0) {
-    const pages = wrap.querySelectorAll('.notebook-page-input');
-    if (pages[focusIdx]) {
-      const ta = pages[focusIdx].querySelector('textarea');
-      if (ta) { ta.focus(); }
-    }
-  }
+  // Update styles
+  linesDiv.style.backgroundSize     = `100% ${lhPx}`;
+  linesDiv.style.backgroundPosition = `0 ${ptPx}`;
+  linesDiv.style.display = s.lines ? 'block' : 'none';
+
+  marginDiv.style.left    = mlPx;
+  marginDiv.style.display = s.margin ? 'block' : 'none';
+
+  ta.style.fontFamily    = s.font;
+  ta.style.fontSize      = fsPx;
+  ta.style.lineHeight    = lhPx;
+  ta.style.color         = s.color;
+  ta.style.paddingLeft   = `calc(${mlPx} + 4px)`;
+  ta.style.paddingTop    = ptPx;
+  ta.style.paddingRight  = prPx;
+  ta.style.wordSpacing   = s.ws + 'px';
+  ta.style.letterSpacing = s.ls + 'px';
 }
 
-// Rebuild on window resize so font scale stays accurate
 window.addEventListener('resize', () => rebuildPages());
 
 [fontSelect, fontSize, inkColor, paperMargin, paperLines, wordSpacing, letterSpacing]
@@ -1063,6 +1045,8 @@ window.addEventListener('resize', () => rebuildPages());
 // Run after fonts load for accurate initial scale
 document.fonts.ready.then(() => rebuildPages());
 rebuildPages();
+
+document.getElementById('downloadPdfBtn').addEventListener('click', downloadAllAsPDF);
 
 // helper so generateImage can read current text
 function getCurrentText() { return masterText; }
@@ -1073,7 +1057,7 @@ async function generateImage() {
   const spinner = document.getElementById('spinner');
   btn.disabled = true;
   spinner.style.display = 'block';
-  btn.innerHTML = 'Generating…';
+  btn.innerHTML = 'Generating...';
 
   try {
     const text = getCurrentText() || 'Start writing something above.';
@@ -1207,10 +1191,15 @@ async function generateImage() {
     container.style.display = 'flex';
 
     document.getElementById('outputPlaceholder').style.display = 'none';
-    document.getElementById('outputHeading').textContent = `Output (${pages.length} page${pages.length > 1 ? 's' : ''})`;
+    document.getElementById('outputHeading').textContent = 'Output (' + pages.length + ' page' + (pages.length > 1 ? 's' : '') + ')';
+
+    // Store canvases globally for PDF export
+    window._generatedCanvases = [];
 
     pages.forEach((pageLines, idx) => {
       const cv = drawPage(pageLines);
+      window._generatedCanvases.push(cv);
+
       const card = document.createElement('div');
       card.className = 'page-card';
       card.appendChild(cv);
@@ -1219,18 +1208,22 @@ async function generateImage() {
       footer.className = 'page-card-footer';
       const lbl = document.createElement('span');
       lbl.className = 'page-label';
-      lbl.textContent = `Page ${idx + 1} of ${pages.length}`;
+      lbl.textContent = 'Page ' + (idx + 1) + ' of ' + pages.length;
       const dlBtn = document.createElement('a');
       dlBtn.className = 'page-dl-btn';
-      dlBtn.textContent = '⬇️ Download';
-      dlBtn.download = `handwriting_page${idx+1}.png`;
-      cv.toBlob(blob => { dlBtn.href = URL.createObjectURL(blob); }, 'image/png', 1.0);
+      dlBtn.textContent = 'Download';
+      dlBtn.download = 'handwriting_page' + (idx + 1) + '.png';
+      cv.toBlob(function(blob) { dlBtn.href = URL.createObjectURL(blob); }, 'image/png', 1.0);
 
       footer.appendChild(lbl);
       footer.appendChild(dlBtn);
       card.appendChild(footer);
       container.appendChild(card);
     });
+
+    // Show PDF download button
+    const actions = document.getElementById('outputActions');
+    actions.style.display = 'flex';
 
   } catch (err) {
     console.error('Generation failed:', err);
@@ -1240,6 +1233,40 @@ async function generateImage() {
   btn.disabled = false;
   spinner.style.display = 'none';
   btn.innerHTML = '✍️&nbsp; Generate Image';
+}
+
+// ── Download all pages as PDF ──
+async function downloadAllAsPDF() {
+  const canvases = window._generatedCanvases;
+  if (!canvases || canvases.length === 0) {
+    alert('Please generate the image first!');
+    return;
+  }
+
+  const pdfBtn = document.getElementById('downloadPdfBtn');
+  pdfBtn.textContent = '⏳ Creating PDF…';
+  pdfBtn.disabled = true;
+
+  try {
+    const { jsPDF } = window.jspdf;
+    // A4 in mm: 210 x 297
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pdfW = 210, pdfH = 297;
+
+    for (let i = 0; i < canvases.length; i++) {
+      if (i > 0) pdf.addPage();
+      const imgData = canvases[i].toDataURL('image/jpeg', 0.92);
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, pdfH);
+    }
+
+    pdf.save('handwriting.pdf');
+  } catch (err) {
+    console.error('PDF failed:', err);
+    alert('PDF creation failed: ' + err.message);
+  }
+
+  pdfBtn.innerHTML = '📄 Download All as PDF';
+  pdfBtn.disabled = false;
 }
 </script>
 </body>
