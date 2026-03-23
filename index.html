@@ -608,7 +608,9 @@
       <span class="card-title">Input</span>
     </div>
     <div class="card-body">
-      <textarea id="inputText" placeholder="Type or paste your text here...">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut rhoncus dui eget tortor feugiat iaculis. Morbi et dolor in felis viverra efficitur.</textarea>
+      <textarea id="inputText" placeholder="Write something here to see the live preview...">Start writing here to see the live preview.
+This tool converts your typed text into realistic handwritten notes.
+Try customizing the font, ink color, and paper style on the right!</textarea>
     </div>
     <div style="padding: 0 20px 10px;">
       <div style="font-size:.75rem;color:var(--muted);margin-bottom:8px;font-weight:500;">Live Preview</div>
@@ -935,27 +937,65 @@ async function generateImage() {
   const withMargin = paperMargin.checked;
   const effects = document.getElementById('effects').value;
 
-  // Page dimensions (A4-ish at 96dpi)
-  const W = 794, H = 1122;
+  // Page dimensions — render at 3x for HD (≈300 DPI equivalent)
+  const SCALE = 3;
+  const W = 794;
+  const A4_H = 1122;
   const marginLeft = withMargin ? 80 : 24;
   const marginTop = 40;
-  const lineH = size * 1.8;
+  const maxWidth = W - marginLeft - 24;
+
+  // ── First pass: measure how many lines we need ──
+  const measureCanvas = document.createElement('canvas');
+  measureCanvas.width = W; measureCanvas.height = 100;
+  const mCtx = measureCanvas.getContext('2d');
+  mCtx.font = `${size}px ${font}`;
+
+  function wrapText(ctx2, txt, maxW) {
+    const lines = [];
+    for (const para of txt.split('\n')) {
+      if (para.trim() === '') { lines.push(''); continue; }
+      const words = para.split(' ');
+      let cur = '';
+      for (const w of words) {
+        const test = cur ? cur + ' ' + w : w;
+        if (ctx2.measureText(test).width > maxW && cur) {
+          lines.push(cur); cur = w;
+        } else { cur = test; }
+      }
+      if (cur) lines.push(cur);
+    }
+    return lines;
+  }
+
+  const wrappedLines = wrapText(mCtx, text, maxWidth);
+
+  // Calculate total height needed — minimum A4, expand for more content
+  const contentHeight = marginTop + lineH + wrappedLines.length * lineH + 40;
+  // Snap to full A4 pages
+  const pages = Math.max(1, Math.ceil(contentHeight / A4_H));
+  const H = pages * A4_H;
 
   const canvas = document.getElementById('outputCanvas');
-  canvas.width = W; canvas.height = H;
+  canvas.width  = W * SCALE;
+  canvas.height = H * SCALE;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+
   const ctx = canvas.getContext('2d');
+  ctx.scale(SCALE, SCALE);
 
   // Paper background
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, H);
 
   // Subtle paper texture
-  for (let i = 0; i < 3000; i++) {
+  for (let i = 0; i < 3000 * pages; i++) {
     ctx.fillStyle = `rgba(0,0,0,${Math.random()*0.012})`;
     ctx.fillRect(Math.random()*W, Math.random()*H, 1, 1);
   }
 
-  // Lines
+  // Lines across full height
   if (withLines) {
     ctx.strokeStyle = '#d9d9e8';
     ctx.lineWidth = 1;
@@ -964,7 +1004,18 @@ async function generateImage() {
     }
   }
 
-  // Margin
+  // Page break borders (subtle)
+  if (pages > 1) {
+    ctx.strokeStyle = 'rgba(180,180,200,0.5)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 4]);
+    for (let p = 1; p < pages; p++) {
+      ctx.beginPath(); ctx.moveTo(0, p * A4_H); ctx.lineTo(W, p * A4_H); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
+  // Margin line
   if (withMargin) {
     ctx.strokeStyle = 'rgba(255,100,100,0.45)';
     ctx.lineWidth = 1.5;
@@ -975,40 +1026,17 @@ async function generateImage() {
   ctx.font = `${size}px ${font}`;
   ctx.fillStyle = color;
 
-  // Word wrap helper
-  function wrapText(txt, maxW) {
-    const lines = [];
-    for (const para of txt.split('\n')) {
-      const words = para.split(' ');
-      let cur = '';
-      for (const w of words) {
-        const test = cur ? cur + ' ' + w : w;
-        if (ctx.measureText(test).width + ws * test.split(' ').length > maxW && cur) {
-          lines.push(cur); cur = w;
-        } else { cur = test; }
-      }
-      lines.push(cur);
-    }
-    return lines;
-  }
-
-  const maxWidth = W - marginLeft - 24;
-  const wrappedLines = wrapText(text, maxWidth);
-
   let y = marginTop + lineH;
   for (const line of wrappedLines) {
-    if (y > H - 30) break;
     const tilt = effects === 'slight-tilt' ? (Math.random() - 0.5) * 0.015 : 0;
     ctx.save();
     ctx.translate(marginLeft, y);
     ctx.rotate(tilt);
-
     if (effects === 'shadows') {
       ctx.shadowColor = 'rgba(0,0,0,0.12)';
       ctx.shadowBlur = 1;
       ctx.shadowOffsetX = 0.5; ctx.shadowOffsetY = 0.5;
     }
-    // letter spacing: draw char by char
     if (ls !== 0) {
       let xp = 0;
       for (const ch of line) {
@@ -1027,7 +1055,7 @@ async function generateImage() {
   canvas.style.display = 'block';
   const downloadBtn = document.getElementById('downloadBtn');
   downloadBtn.style.display = 'inline-block';
-  downloadBtn.href = canvas.toDataURL('image/png');
+  downloadBtn.href = canvas.toDataURL('image/png', 1.0);
 
   btn.disabled = false;
   spinner.style.display = 'none';
