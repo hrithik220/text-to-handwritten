@@ -923,139 +923,159 @@ async function generateImage() {
   const spinner = document.getElementById('spinner');
   btn.disabled = true;
   spinner.style.display = 'block';
-  btn.textContent = 'Generating…';
+  btn.innerHTML = 'Generating…';
 
-  await new Promise(r => setTimeout(r, 80)); // let fonts load
+  try {
+    const text = inputText.value || 'Start writing something above.';
+    const fontVal = fontSelect.value;
+    const size = parseInt(fontSize.value) || 18;
+    const color = inkColor.value;
+    const ws = parseInt(wordSpacing.value) || 0;
+    const ls = parseInt(letterSpacing.value) || 0;
+    const withLines = paperLines.checked;
+    const withMargin = paperMargin.checked;
+    const effects = document.getElementById('effects').value;
 
-  const text = inputText.value || 'Enter some text above.';
-  const font = fontSelect.value;
-  const size = parseInt(fontSize.value) || 18;
-  const color = inkColor.value;
-  const ws = parseInt(wordSpacing.value) || 0;
-  const ls = parseInt(letterSpacing.value) || 0;
-  const withLines = paperLines.checked;
-  const withMargin = paperMargin.checked;
-  const effects = document.getElementById('effects').value;
+    // Wait for fonts to be ready
+    await document.fonts.ready;
+    await new Promise(r => setTimeout(r, 120));
 
-  // Page dimensions — render at 3x for HD (≈300 DPI equivalent)
-  const SCALE = 3;
-  const W = 794;
-  const A4_H = 1122;
-  const marginLeft = withMargin ? 80 : 24;
-  const marginTop = 40;
-  const maxWidth = W - marginLeft - 24;
+    // Constants
+    const SCALE = 3;
+    const W = 794;
+    const A4_H = 1122;
+    const marginLeft = withMargin ? 80 : 24;
+    const marginTop = 40;
+    const lineH = size * 1.8;
+    const maxWidth = W - marginLeft - 30;
 
-  // ── First pass: measure how many lines we need ──
-  const measureCanvas = document.createElement('canvas');
-  measureCanvas.width = W; measureCanvas.height = 100;
-  const mCtx = measureCanvas.getContext('2d');
-  mCtx.font = `${size}px ${font}`;
+    // ── Measure pass: figure out how many wrapped lines ──
+    const mCanvas = document.createElement('canvas');
+    mCanvas.width = W * SCALE; mCanvas.height = 200;
+    const mCtx = mCanvas.getContext('2d');
+    mCtx.font = `${size}px ${fontVal}`;
 
-  function wrapText(ctx2, txt, maxW) {
-    const lines = [];
-    for (const para of txt.split('\n')) {
-      if (para.trim() === '') { lines.push(''); continue; }
-      const words = para.split(' ');
-      let cur = '';
-      for (const w of words) {
-        const test = cur ? cur + ' ' + w : w;
-        if (ctx2.measureText(test).width > maxW && cur) {
-          lines.push(cur); cur = w;
-        } else { cur = test; }
+    function wrapText(ctx2, txt, maxW) {
+      const result = [];
+      for (const para of txt.split('\n')) {
+        if (para.trim() === '') { result.push(''); continue; }
+        const words = para.split(' ');
+        let cur = '';
+        for (const w of words) {
+          const test = cur ? cur + ' ' + w : w;
+          if (ctx2.measureText(test).width > maxW && cur) {
+            result.push(cur); cur = w;
+          } else { cur = test; }
+        }
+        if (cur !== '') result.push(cur);
       }
-      if (cur) lines.push(cur);
+      return result;
     }
-    return lines;
-  }
 
-  const wrappedLines = wrapText(mCtx, text, maxWidth);
+    const wrappedLines = wrapText(mCtx, text, maxWidth);
 
-  // Calculate total height needed — minimum A4, expand for more content
-  const contentHeight = marginTop + lineH + wrappedLines.length * lineH + 40;
-  // Snap to full A4 pages
-  const pages = Math.max(1, Math.ceil(contentHeight / A4_H));
-  const H = pages * A4_H;
+    // Snap canvas height to full A4 pages
+    const contentHeight = marginTop + lineH + wrappedLines.length * lineH + 60;
+    const pages = Math.max(1, Math.ceil(contentHeight / A4_H));
+    const H = pages * A4_H;
 
-  const canvas = document.getElementById('outputCanvas');
-  canvas.width  = W * SCALE;
-  canvas.height = H * SCALE;
-  canvas.style.width  = W + 'px';
-  canvas.style.height = H + 'px';
+    // ── Draw canvas ──
+    const canvas = document.getElementById('outputCanvas');
+    canvas.width  = W * SCALE;   // actual pixels: 2382px wide
+    canvas.height = H * SCALE;   // actual pixels: 3366px+ tall
+    canvas.style.width  = '100%'; // display: fits container
+    canvas.style.height = 'auto'; // display: proportional
 
-  const ctx = canvas.getContext('2d');
-  ctx.scale(SCALE, SCALE);
+    const ctx = canvas.getContext('2d');
+    ctx.scale(SCALE, SCALE);
 
-  // Paper background
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, W, H);
+    // Paper background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, H);
 
-  // Subtle paper texture
-  for (let i = 0; i < 3000 * pages; i++) {
-    ctx.fillStyle = `rgba(0,0,0,${Math.random()*0.012})`;
-    ctx.fillRect(Math.random()*W, Math.random()*H, 1, 1);
-  }
-
-  // Lines across full height
-  if (withLines) {
-    ctx.strokeStyle = '#d9d9e8';
-    ctx.lineWidth = 1;
-    for (let y = marginTop + lineH; y < H - 20; y += lineH) {
-      ctx.beginPath(); ctx.moveTo(20, y); ctx.lineTo(W-20, y); ctx.stroke();
+    // Subtle paper texture
+    for (let i = 0; i < 2000 * pages; i++) {
+      ctx.fillStyle = `rgba(0,0,0,${Math.random() * 0.01})`;
+      ctx.fillRect(Math.random() * W, Math.random() * H, 1, 1);
     }
-  }
 
-  // Page break borders (subtle)
-  if (pages > 1) {
-    ctx.strokeStyle = 'rgba(180,180,200,0.5)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([6, 4]);
-    for (let p = 1; p < pages; p++) {
-      ctx.beginPath(); ctx.moveTo(0, p * A4_H); ctx.lineTo(W, p * A4_H); ctx.stroke();
-    }
-    ctx.setLineDash([]);
-  }
-
-  // Margin line
-  if (withMargin) {
-    ctx.strokeStyle = 'rgba(255,100,100,0.45)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(60, 0); ctx.lineTo(60, H); ctx.stroke();
-  }
-
-  // Text
-  ctx.font = `${size}px ${font}`;
-  ctx.fillStyle = color;
-
-  let y = marginTop + lineH;
-  for (const line of wrappedLines) {
-    const tilt = effects === 'slight-tilt' ? (Math.random() - 0.5) * 0.015 : 0;
-    ctx.save();
-    ctx.translate(marginLeft, y);
-    ctx.rotate(tilt);
-    if (effects === 'shadows') {
-      ctx.shadowColor = 'rgba(0,0,0,0.12)';
-      ctx.shadowBlur = 1;
-      ctx.shadowOffsetX = 0.5; ctx.shadowOffsetY = 0.5;
-    }
-    if (ls !== 0) {
-      let xp = 0;
-      for (const ch of line) {
-        ctx.fillText(ch, xp, 0);
-        xp += ctx.measureText(ch).width + ls;
+    // Ruled lines
+    if (withLines) {
+      ctx.strokeStyle = '#d9d9e8';
+      ctx.lineWidth = 0.8;
+      for (let ly = marginTop + lineH; ly < H - 10; ly += lineH) {
+        ctx.beginPath(); ctx.moveTo(16, ly); ctx.lineTo(W - 16, ly); ctx.stroke();
       }
-    } else {
-      ctx.fillText(line, 0, 0);
     }
-    ctx.restore();
-    y += lineH;
-  }
 
-  // Show output
-  document.getElementById('outputPlaceholder').style.display = 'none';
-  canvas.style.display = 'block';
-  const downloadBtn = document.getElementById('downloadBtn');
-  downloadBtn.style.display = 'inline-block';
-  downloadBtn.href = canvas.toDataURL('image/png', 1.0);
+    // Page break markers
+    if (pages > 1) {
+      ctx.strokeStyle = 'rgba(180,180,210,0.45)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 5]);
+      for (let p = 1; p < pages; p++) {
+        ctx.beginPath(); ctx.moveTo(0, p * A4_H); ctx.lineTo(W, p * A4_H); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
+
+    // Margin line
+    if (withMargin) {
+      ctx.strokeStyle = 'rgba(255,90,90,0.4)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(60, 0); ctx.lineTo(60, H); ctx.stroke();
+    }
+
+    // Text rendering
+    ctx.font = `${size}px ${fontVal}`;
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'alphabetic';
+
+    let y = marginTop + lineH;
+    for (const line of wrappedLines) {
+      if (!line) { y += lineH; continue; }
+
+      const tilt = effects === 'slight-tilt' ? (Math.random() - 0.5) * 0.012 : 0;
+      ctx.save();
+      ctx.translate(marginLeft, y);
+      ctx.rotate(tilt);
+
+      if (effects === 'shadows') {
+        ctx.shadowColor = 'rgba(0,0,0,0.1)';
+        ctx.shadowBlur = 1.5;
+        ctx.shadowOffsetX = 0.6; ctx.shadowOffsetY = 0.6;
+      }
+
+      if (ls !== 0) {
+        let xp = 0;
+        for (const ch of line) {
+          ctx.fillText(ch, xp, 0);
+          xp += ctx.measureText(ch).width + ls;
+        }
+      } else {
+        ctx.fillText(line, 0, 0);
+      }
+      ctx.restore();
+      y += lineH;
+    }
+
+    // Show output
+    document.getElementById('outputPlaceholder').style.display = 'none';
+    canvas.style.display = 'block';
+    const downloadBtn = document.getElementById('downloadBtn');
+    downloadBtn.style.display = 'inline-block';
+
+    // Use Blob for reliable HD download (avoids toDataURL size limits)
+    canvas.toBlob((blob) => {
+      const url = URL.createObjectURL(blob);
+      downloadBtn.href = url;
+      downloadBtn.download = 'handwriting_hd.png';
+    }, 'image/png', 1.0);
+
+  } catch (err) {
+    console.error('Generation failed:', err);
+    alert('Something went wrong: ' + err.message);
+  }
 
   btn.disabled = false;
   spinner.style.display = 'none';
